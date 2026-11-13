@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simulador · Péndulo con cuerda elástica</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #3f4352; --soft: #6a7080; --mute: #8a909c;
+    --purple: #5c5bd4; --teal: #2f6e6a; --orange: #b86a33;
+    --mint: #dcefe8; --lav: #dfe1f7; --peach: #f8e4da;
+    --line: rgba(63, 67, 82, .12);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Inter", system-ui, sans-serif; color: var(--ink); min-height: 100vh;
+    background:
+      radial-gradient(ellipse 700px 500px at 0% 0%, rgba(150, 205, 186, .45), transparent 70%),
+      radial-gradient(ellipse 700px 520px at 100% 100%, rgba(168, 172, 236, .40), transparent 70%),
+      radial-gradient(ellipse 500px 360px at 0% 100%, rgba(240, 190, 166, .30), transparent 70%),
+      linear-gradient(135deg, #eef4f2 0%, #eceff6 100%);
+    background-attachment: fixed;
+  }
+  .wrap { max-width: 1480px; margin: 0 auto; padding: 22px 22px 40px; }
+  header h1 { font-size: 28px; font-weight: 800; letter-spacing: -.5px; }
+  header p { color: var(--soft); margin-top: 4px; font-size: 15px; }
+  .card { background: rgba(255, 255, 255, .82); border-radius: 14px; box-shadow: 0 8px 22px rgba(60, 70, 90, .10); padding: 16px 18px; }
+  .card h2 { font-size: 15px; font-weight: 800; letter-spacing: .3px; margin-bottom: 10px; }
+  .card h2 small { font-weight: 500; color: var(--mute); letter-spacing: 0; }
+
+  /* Ecuaciones */
+  .eqs { display: grid; grid-template-columns: 1.15fr 1fr; gap: 16px; margin-top: 16px; }
+  .eqbox { background: var(--lav); }
+  .eq { font-family: "Cambria Math", "STIX Two Math", "Times New Roman", serif; font-size: 22px; font-style: italic;
+        background: rgba(255,255,255,.85); border-radius: 10px; padding: 10px 14px; margin-bottom: 8px; line-height: 1.5; }
+  .eq .lab { font-family: "Inter"; font-style: normal; font-size: 11px; font-weight: 800; color: var(--purple); letter-spacing: .6px; display: block; }
+  .dd, .d1 { position: relative; display: inline-block; line-height: 1; }
+  .dd::before, .d1::before { content: ""; position: absolute; top: -0.16em; width: 0.13em; height: 0.13em; border-radius: 50%;
+      background: currentColor; }
+  .dd::before { left: calc(55% - 0.19em); box-shadow: 0.24em 0 0 currentColor; }
+  .d1::before { left: calc(58% - 0.07em); }
+  .new { color: var(--orange); font-weight: 700; border-bottom: 2px dotted var(--orange); }
+  .eqnote { font-size: 13px; color: var(--soft); line-height: 1.5; }
+  .eqnote b { color: var(--ink); }
+  .vars { background: var(--peach); }
+  .vars ul { list-style: none; display: grid; gap: 7px; }
+  .vars li { font-size: 13.5px; line-height: 1.45; color: var(--soft); background: rgba(255,255,255,.8); border-radius: 9px; padding: 7px 10px; }
+  .vars li b { color: var(--ink); }
+  .vars li .t { color: var(--orange); font-weight: 700; font-family: "Cambria Math", serif; font-style: italic; }
+
+  /* Fila principal */
+  .main { display: grid; grid-template-columns: 300px minmax(0, 1fr) 430px; gap: 16px; margin-top: 16px; align-items: start; }
+  .ctrl label { display: block; margin-bottom: 12px; }
+  .ctrl .row { display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+  .ctrl .row span:last-child { color: var(--purple); font-variant-numeric: tabular-nums; }
+  .ctrl .hint { font-size: 11.5px; color: var(--mute); margin-top: 2px; }
+  input[type=range] { width: 100%; accent-color: var(--purple); }
+  .btns { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0 4px; }
+  button { font: inherit; font-size: 13px; font-weight: 700; border: 0; border-radius: 20px; padding: 8px 14px; cursor: pointer;
+           background: #474c5e; color: #fff; }
+  button.alt { background: #fff; color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--line); }
+  button.pre { background: rgba(92, 91, 212, .1); color: var(--purple); font-size: 12px; padding: 7px 11px; }
+  button:active { transform: translateY(1px); }
+  .chk { display: flex; gap: 8px; align-items: center; font-size: 13px; margin-top: 8px; color: var(--soft); }
+  .sep { height: 1px; background: var(--line); margin: 14px 0; }
+
+  .mag { font-size: 12.5px; color: var(--soft); line-height: 1.55; }
+  .mag div { padding: 6px 0; border-bottom: 1px dashed var(--line); }
+  .mag div:last-child { border-bottom: 0; }
+  .mag b { color: var(--ink); font-variant-numeric: tabular-nums; }
+  .mag .f { font-family: "Cambria Math", serif; font-style: italic; color: var(--ink); }
+  .alert { margin-top: 10px; font-size: 12.5px; line-height: 1.45; border-radius: 9px; padding: 8px 10px; background: var(--mint); color: var(--teal); }
+  .alert.res { background: var(--peach); color: var(--orange); font-weight: 600; }
+
+  .sim { background: var(--mint); padding: 12px; }
+  .simhead { display: flex; justify-content: space-between; align-items: center; padding: 2px 4px 8px; font-size: 13px; color: var(--soft); }
+  .simhead b { color: var(--ink); font-variant-numeric: tabular-nums; }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--soft); }
+  .legend i { display: inline-block; width: 18px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 5px; }
+  canvas { display: block; width: 100%; border-radius: 10px; background: rgba(255,255,255,.65); }
+  #cv, .cvmain { height: 440px; }
+  #ch, .cvchart { height: 220px; margin-top: 10px; }
+  .tabs { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+  .tabs a { text-decoration: none; font-weight: 700; font-size: 14px; color: var(--ink); background: rgba(255,255,255,.7);
+            padding: 10px 18px; border-radius: 24px; box-shadow: inset 0 0 0 1.5px var(--line); }
+  .tabs a b { display: inline-flex; width: 22px; height: 22px; border-radius: 50%; background: var(--orange); color: #fff;
+              align-items: center; justify-content: center; font-size: 12px; margin-right: 8px; }
+  .tabs a.on { background: var(--purple); color: #fff; box-shadow: 0 6px 16px rgba(92,91,212,.3); }
+  .tab { display: none; } .tab.on { display: block; }
+  .tabintro { margin-top: 14px; font-size: 14px; color: var(--soft); }
+
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 10px; }
+  .stat { background: #fff; border-radius: 10px; padding: 8px 6px; text-align: center; box-shadow: 0 3px 10px rgba(60,70,90,.07); }
+  .stat b { display: block; font-size: 17px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .stat span { font-size: 10.5px; color: var(--mute); }
+  .stat.t b { color: var(--teal); } .stat.p b { color: var(--purple); } .stat.o b { color: var(--orange); }
+  .tbl { max-height: 600px; overflow: auto; border-radius: 10px; background: #fff; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+  thead th { position: sticky; top: 0; background: var(--purple); color: #fff; font-weight: 700; padding: 8px 6px; text-align: right; font-size: 11.5px; line-height: 1.25; }
+  thead th:first-child, tbody td:first-child { text-align: left; padding-left: 10px; }
+  tbody td { padding: 5px 6px; text-align: right; border-bottom: 1px solid #f0f1f4; }
+  tbody tr:nth-child(even) { background: #f8f9fb; }
+  td.e { color: var(--teal); font-weight: 600; } td.s { color: var(--purple); } td.d { color: var(--orange); }
+  .tfoot { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; font-size: 12px; color: var(--mute); gap: 8px; }
+
+  .modal { position: fixed; inset: 0; background: rgba(40,44,60,.45); display: none; align-items: center; justify-content: center; padding: 20px; }
+  .modal.on { display: flex; }
+  .modal .card { width: min(640px, 100%); }
+  .modal textarea { width: 100%; height: 260px; font: 12px ui-monospace, monospace; margin: 8px 0 10px; border-radius: 8px; border: 1px solid var(--line); padding: 8px; }
+
+  @media (max-width: 1250px) {
+    .main { grid-template-columns: 290px minmax(0, 1fr); }
+    .tablecard { grid-column: 1 / -1; }
+  }
+  @media (max-width: 860px) {
+    .eqs, .main { grid-template-columns: 1fr; }
+    #cv, .cvmain { height: 360px; }
+    .eq { font-size: 18px; }
+    .stats { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Simulador del péndulo simple</h1>
+    <p>Mueve las variables y compara el modelo con lo que pasa de verdad. La tabla de datos se llena sola.</p>
+  </header>
+  <nav class="tabs">
+    <a href="#guia" data-tab="guia"><b>1</b>Modelo de la guía (cuerda rígida)</a>
+    <a href="#elastica" data-tab="elastica"><b>2</b>Cuerda elástica (más variables)</a>
+  </nav>
+  <div class="tab" id="tab-guia">
+  <p class="tabintro">Modelo de la guía: masa puntual, cuerda que no se estira, sin fricción en el pivote. El aire lo puedes prender o apagar.</p>
+  <section class="eqs">
+    <div class="card eqbox">
+      <h2>Ecuaciones <small>· el término del aire va en naranja y solo aparece si lo prendes</small></h2>
+      <div class="eq"><span class="lab">1 · EXACTA (Newton)</span>
+        <span class="dd">θ</span> <span class="new">+ (b/m)·<span class="d1">θ</span></span> + (g/L)·sin θ = 0</div>
+      <div class="eq"><span class="lab">2 · LINEAL · MAS (Taylor: sin θ ≈ θ)</span>
+        <span class="dd">θ</span> <span class="new">+ (b/m)·<span class="d1">θ</span></span> + (g/L)·θ = 0 &nbsp;→&nbsp; θ(t) = θ₀·cos(ω₀t)</div>
+      <p class="eqnote">La única diferencia es <b>sin θ</b> contra <b>θ</b>. Como sin θ = θ − θ³/6 + …, con ángulos pequeños casi no importa. Con ángulos grandes, la exacta va <b>más lenta</b>.</p>
+    </div>
+    <div class="card vars">
+      <h2>Qué mirar</h2>
+      <ul>
+        <li><b>Ángulo pequeño (10°):</b> las dos curvas van pegadas. El MAS funciona.</li>
+        <li><b>Ángulo grande (60°):</b> la exacta se atrasa en cada vuelta. El período crece con la amplitud.</li>
+        <li><b>Masa m:</b> sin aire, moverla <b>no cambia nada</b>, porque se cancela. Con aire sí importa, por el término b/m.</li>
+        <li><b>Con aire:</b> la amplitud se apaga poco a poco y la energía baja. Mira la columna E de la tabla.</li>
+        <li><b>Largo L y gravedad g:</b> cambian el período, T₀ = 2π√(L/g), pero no la forma del movimiento.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="main">
+    <div class="card ctrl">
+      <h2>Variables</h2>
+      <label><div class="row"><span>Largo de la cuerda L</span><span id="gv_L"></span></div>
+        <input type="range" id="gs_L" min="0.2" max="3" step="0.05" value="1.2"></label>
+      <label><div class="row"><span>Gravedad g</span><span id="gv_g"></span></div>
+        <input type="range" id="gs_g" min="1.6" max="24.8" step="0.1" value="9.8">
+        <div class="hint">Luna 1.6 · Tierra 9.8 · Júpiter 24.8</div></label>
+      <label><div class="row"><span>Ángulo inicial θ₀</span><span id="gv_th0"></span></div>
+        <input type="range" id="gs_th0" min="1" max="170" step="1" value="20"></label>
+      <label><div class="row"><span>Masa m</span><span id="gv_m"></span></div>
+        <input type="range" id="gs_m" min="0.1" max="2" step="0.05" value="0.5"></label>
+      <div class="chk" style="margin:0 0 8px"><input type="checkbox" id="gc_air"><label for="gc_air" style="margin:0"><b>Resistencia del aire</b></label></div>
+      <label><div class="row"><span>Coeficiente del aire b</span><span id="gv_b"></span></div>
+        <input type="range" id="gs_b" min="0.01" max="0.5" step="0.01" value="0.05">
+        <div class="hint">Solo cuenta si el aire está prendido</div></label>
+      <label><div class="row"><span>Velocidad de la animación</span><span id="gv_sp"></span></div>
+        <input type="range" id="gs_sp" min="0.1" max="2" step="0.05" value="1"></label>
+
+      <div class="btns">
+        <button id="gb_play">Pausa</button>
+        <button class="alt" id="gb_reset">Reiniciar</button>
+      </div>
+      <div class="chk"><input type="checkbox" id="gc_ghost" checked><label for="gc_ghost" style="margin:0">Mostrar el MAS</label></div>
+      <div class="chk"><input type="checkbox" id="gc_trail" checked><label for="gc_trail" style="margin:0">Mostrar trayectoria</label></div>
+      <div class="chk"><input type="checkbox" id="gc_teddy" checked><label for="gc_teddy" style="margin:0">Usar a Teddy como masa 🐶</label></div>
+
+      <div class="sep"></div>
+      <h2>Casos rápidos</h2>
+      <div class="btns">
+        <button class="pre gpre" data-p="peq">Ángulo pequeño 10°</button>
+        <button class="pre gpre" data-p="grande">Ángulo grande 60°</button>
+        <button class="pre gpre" data-p="arriba">Casi arriba 160°</button>
+        <button class="pre gpre" data-p="aire">Con aire</button>
+        <button class="pre gpre" data-p="luna">En la Luna</button>
+      </div>
+
+      <div class="sep"></div>
+      <h2>Magnitudes <small>· con los valores puestos</small></h2>
+      <div class="mag" id="g_mag"></div>
+      <div class="alert" id="g_alert"></div>
+    </div>
+
+    <div class="card sim">
+      <div class="simhead">
+        <div class="legend">
+          <span><i style="background:var(--teal)"></i>Exacta (sin θ)</span>
+          <span><i style="background:var(--purple)"></i>MAS (θ)</span>
+          <span><i style="background:var(--orange)"></i>Diferencia</span>
+        </div>
+        <span>t = <b id="g_tnow">0.00</b> s</span>
+      </div>
+      <canvas id="g_cv" class="cvmain"></canvas>
+      <canvas id="g_ch" class="cvchart"></canvas>
+    </div>
+
+    <div class="card tablecard">
+      <h2>Tabla de datos <small>· un dato cada 0.1 s</small></h2>
+      <div class="stats">
+        <div class="stat t"><b id="gst_Te">–</b><span>Período exacto medido (s)</span></div>
+        <div class="stat p"><b id="gst_T0">–</b><span>Período del MAS (s)</span></div>
+        <div class="stat o"><b id="gst_dT">–</b><span>Exacto más lento</span></div>
+        <div class="stat"><b id="gst_dE">–</b><span>Cambio de energía</span></div>
+      </div>
+      <div class="tbl" id="g_tblwrap">
+        <table>
+          <thead><tr>
+            <th>t<br>(s)</th><th>θ exacta<br>(°)</th><th>θ MAS<br>(°)</th><th>Diferencia<br>(°)</th><th>E total<br>(J)</th>
+          </tr></thead>
+          <tbody id="g_tb"></tbody>
+        </table>
+      </div>
+      <div class="tfoot">
+        <span id="g_rows">0 filas</span>
+        <button class="alt" id="gb_copy">Copiar tabla (para Excel/Origin)</button>
+      </div>
+    </div>
+  </section>
+  </div>
+
+  <div class="tab" id="tab-elastica">
+  <p class="tabintro">¿Y si la cuerda se estira? Condiciones ideales: sin aire, sin fricción y una cuerda sin masa que se estira como un resorte (ley de Hooke).</p>
+
+  <section class="eqs">
+    <div class="card eqbox">
+      <h2>Ecuaciones de movimiento <small>· los términos nuevos van en naranja</small></h2>
+      <div class="eq"><span class="lab">1 · LARGO DE LA CUERDA (nueva ecuación)</span>
+        r̈ = <span class="new">r·<span class="d1">θ</span>²</span> + g·cos θ <span class="new">− (k/m)(r − L₀)</span></div>
+      <div class="eq"><span class="lab">2 · ÁNGULO</span>
+        <span class="dd">θ</span> = −(g/<span class="new">r</span>)·sin θ <span class="new">− 2·ṙ·<span class="d1">θ</span> / r</span></div>
+      <p class="eqnote">Si la cuerda es muy rígida (<b>k → ∞</b>), r ya no cambia, r = L, ṙ = 0, y la ecuación 2 vuelve a ser la del péndulo simple: <b><span class="dd">θ</span> + (g/L)·sin θ = 0</b>. Pruébalo con el botón “Cuerda casi rígida”.</p>
+    </div>
+    <div class="card vars">
+      <h2>¿Qué variables se agregan?</h2>
+      <ul>
+        <li><b>k</b> (N/m): qué tan dura es la cuerda. Con más k, se estira menos.</li>
+        <li><b>L₀</b> (m): el largo de la cuerda sin estirar.</li>
+        <li><b>r(t)</b>: el largo ya no es fijo, cambia con el tiempo. Ahora hay <b>dos</b> cosas que se mueven: θ y r.</li>
+        <li><b>m</b>: ahora <b>sí</b> importa, porque aparece en k/m. En el péndulo simple se cancelaba.</li>
+        <li><span class="t">r·<span class="d1">θ</span>²</span> efecto centrífugo: al balancearse, la cuerda se estira más · <span class="t">−(k/m)(r−L₀)</span> la fuerza del resorte · <span class="t">−2ṙ<span class="d1">θ</span>/r</span> si la cuerda se acorta, gira más rápido (como un patinador que encoge los brazos).</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="main">
+    <!-- CONTROLES -->
+    <div class="card ctrl">
+      <h2>Variables</h2>
+      <label><div class="row"><span>Masa m</span><span id="v_m"></span></div>
+        <input type="range" id="s_m" min="0.1" max="2" step="0.05" value="0.5"></label>
+      <label><div class="row"><span>Rigidez k</span><span id="v_k"></span></div>
+        <input type="range" id="s_k" min="0" max="1000" step="1" value="0">
+        <div class="hint">De 2 a 2000 N/m</div></label>
+      <label><div class="row"><span>Largo sin estirar L₀</span><span id="v_L0"></span></div>
+        <input type="range" id="s_L0" min="0.3" max="2" step="0.05" value="1"></label>
+      <label><div class="row"><span>Gravedad g</span><span id="v_g"></span></div>
+        <input type="range" id="s_g" min="1.6" max="24.8" step="0.1" value="9.8">
+        <div class="hint">Luna 1.6 · Tierra 9.8 · Júpiter 24.8</div></label>
+      <label><div class="row"><span>Ángulo inicial θ₀</span><span id="v_th0"></span></div>
+        <input type="range" id="s_th0" min="0" max="80" step="1" value="20"></label>
+      <label><div class="row"><span>Estiramiento extra inicial</span><span id="v_dr0"></span></div>
+        <input type="range" id="s_dr0" min="-20" max="30" step="1" value="0">
+        <div class="hint">Cuánto lo jalas o lo subes respecto al equilibrio</div></label>
+      <label><div class="row"><span>Velocidad de la animación</span><span id="v_sp"></span></div>
+        <input type="range" id="s_sp" min="0.1" max="2" step="0.05" value="1"></label>
+
+      <div class="btns">
+        <button id="b_play">Pausa</button>
+        <button class="alt" id="b_reset">Reiniciar</button>
+      </div>
+      <div class="chk"><input type="checkbox" id="c_ghost" checked><label for="c_ghost" style="margin:0">Mostrar péndulo simple (cuerda rígida)</label></div>
+      <div class="chk"><input type="checkbox" id="c_trail" checked><label for="c_trail" style="margin:0">Mostrar trayectoria</label></div>
+      <div class="chk"><input type="checkbox" id="c_teddy" checked><label for="c_teddy" style="margin:0">Usar a Teddy como masa 🐶</label></div>
+
+      <div class="sep"></div>
+      <h2>Casos rápidos</h2>
+      <div class="btns">
+        <button class="pre" data-p="base">Normal</button>
+        <button class="pre" data-p="rigida">Cuerda casi rígida</button>
+        <button class="pre" data-p="res">Resonancia</button>
+        <button class="pre" data-p="rebote">Solo rebote</button>
+        <button class="pre" data-p="blanda">Cuerda muy blanda</button>
+      </div>
+
+      <div class="sep"></div>
+      <h2>Magnitudes <small>· con los valores puestos</small></h2>
+      <div class="mag" id="mag"></div>
+      <div class="alert" id="alert"></div>
+    </div>
+
+    <!-- SIMULACIÓN -->
+    <div class="card sim">
+      <div class="simhead">
+        <div class="legend">
+          <span><i style="background:var(--teal)"></i>Cuerda elástica</span>
+          <span><i style="background:var(--purple)"></i>Péndulo simple</span>
+          <span><i style="background:var(--orange)"></i>Estiramiento</span>
+        </div>
+        <span>t = <b id="tnow">0.00</b> s</span>
+      </div>
+      <canvas id="cv"></canvas>
+      <canvas id="ch"></canvas>
+    </div>
+
+    <!-- TABLA -->
+    <div class="card tablecard">
+      <h2>Tabla de datos <small>· un dato cada 0.1 s</small></h2>
+      <div class="stats">
+        <div class="stat o"><b id="st_dmax">–</b><span>Estiramiento máx (cm)</span></div>
+        <div class="stat t"><b id="st_Te">–</b><span>Período elástico (s)</span></div>
+        <div class="stat p"><b id="st_Ts">–</b><span>Período simple (s)</span></div>
+        <div class="stat"><b id="st_dE">–</b><span>Cambio de energía</span></div>
+      </div>
+      <div class="tbl" id="tblwrap">
+        <table>
+          <thead><tr>
+            <th>t<br>(s)</th><th>r<br>(m)</th><th>Estiram.<br>r − L₀ (cm)</th><th>θ elástico<br>(°)</th><th>θ simple<br>(°)</th><th>E total<br>(J)</th>
+          </tr></thead>
+          <tbody id="tb"></tbody>
+        </table>
+      </div>
+      <div class="tfoot">
+        <span id="rows">0 filas</span>
+        <button class="alt" id="b_copy">Copiar tabla (para Excel/Origin)</button>
+      </div>
+    </div>
+  </section>
+  </div>
+</div>
+
+<div class="modal" id="modal">
+  <div class="card">
+    <h2>Copia la tabla</h2>
+    <p class="eqnote">Selecciona todo (Ctrl + A), cópialo (Ctrl + C) y pégalo en Excel u Origin.</p>
+    <textarea id="ta" readonly></textarea>
+    <button id="b_close">Cerrar</button>
+  </div>
+</div>
+
+<script>
+// Teddy: chihuahua crema, orejas grandes, collar azul. (x, y) = punto donde se amarra la cuerda.
+window.drawTeddy = function (ctx, x, y, u, ang, alpha) {
+  ctx.save();
+  ctx.globalAlpha = alpha == null ? 1 : alpha;
+  ctx.translate(x, y); ctx.rotate(ang); ctx.translate(0, 0.74 * u);
+  const fur = "#f7ecdb", furSh = "#e8d6bd", line = "rgba(120, 95, 70, .55)";
+  ctx.lineWidth = Math.max(1, u * 0.06); ctx.lineJoin = "round"; ctx.lineCap = "round";
+
+  // cuerpito y patas
+  ctx.fillStyle = fur; ctx.strokeStyle = line;
+  ctx.beginPath(); ctx.ellipse(0, 1.12 * u, 0.6 * u, 0.62 * u, 0, 0, 2 * Math.PI); ctx.fill(); ctx.stroke();
+  for (const s of [-1, 1]) {
+    ctx.beginPath();
+    ctx.ellipse(s * 0.24 * u, 1.62 * u, 0.15 * u, 0.3 * u, 0, 0, 2 * Math.PI); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(s * 0.24 * u, 1.88 * u, 0.17 * u, 0.1 * u, 0, 0, 2 * Math.PI); ctx.fill(); ctx.stroke();
+  }
+  ctx.fillStyle = furSh; ctx.beginPath(); ctx.ellipse(0, 1.2 * u, 0.3 * u, 0.36 * u, 0, 0, 2 * Math.PI); ctx.globalAlpha *= 0.5; ctx.fill(); ctx.globalAlpha = alpha == null ? 1 : alpha;
+
+  // orejas
+  for (const s of [-1, 1]) {
+    ctx.fillStyle = fur; ctx.strokeStyle = line;
+    ctx.beginPath();
+    ctx.moveTo(s * 0.28 * u, -0.55 * u);
+    ctx.quadraticCurveTo(s * 0.62 * u, -1.25 * u, s * 1.05 * u, -1.32 * u);
+    ctx.quadraticCurveTo(s * 1.08 * u, -0.6 * u, s * 0.78 * u, -0.18 * u);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    const g = ctx.createLinearGradient(s * 0.5 * u, -0.4 * u, s * 0.95 * u, -1.2 * u);
+    g.addColorStop(0, "#f2b9b0"); g.addColorStop(0.75, "#f0c7a8"); g.addColorStop(1, "#e7b37e");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(s * 0.42 * u, -0.5 * u);
+    ctx.quadraticCurveTo(s * 0.68 * u, -1.08 * u, s * 0.96 * u, -1.16 * u);
+    ctx.quadraticCurveTo(s * 0.96 * u, -0.62 * u, s * 0.74 * u, -0.3 * u);
+    ctx.closePath(); ctx.fill();
+  }
+
+  // cabeza con pelito en los cachetes
+  ctx.fillStyle = fur; ctx.strokeStyle = line;
+  ctx.beginPath(); ctx.ellipse(0, 0, 0.8 * u, 0.72 * u, 0, 0, 2 * Math.PI); ctx.fill(); ctx.stroke();
+  for (const s of [-1, 1]) {
+    ctx.beginPath(); ctx.moveTo(s * 0.74 * u, 0.18 * u);
+    ctx.lineTo(s * 0.9 * u, 0.3 * u); ctx.lineTo(s * 0.74 * u, 0.34 * u); ctx.lineTo(s * 0.86 * u, 0.46 * u); ctx.lineTo(s * 0.6 * u, 0.5 * u);
+    ctx.fill(); ctx.stroke();
+  }
+  ctx.fillStyle = fur; ctx.beginPath(); ctx.ellipse(0, 0.05 * u, 0.74 * u, 0.62 * u, 0, 0, 2 * Math.PI); ctx.fill();
+
+  // hocico
+  ctx.fillStyle = "#fbf4ea"; ctx.beginPath(); ctx.ellipse(0, 0.33 * u, 0.33 * u, 0.25 * u, 0, 0, 2 * Math.PI); ctx.fill();
+  ctx.fillStyle = "rgba(150, 120, 105, .28)"; ctx.beginPath(); ctx.ellipse(0, 0.42 * u, 0.2 * u, 0.12 * u, 0, 0, 2 * Math.PI); ctx.fill();
+  // nariz
+  ctx.fillStyle = "#6e4b47"; ctx.beginPath(); ctx.ellipse(0, 0.24 * u, 0.14 * u, 0.1 * u, 0, 0, 2 * Math.PI); ctx.fill();
+  ctx.fillStyle = "rgba(255,255,255,.55)"; ctx.beginPath(); ctx.ellipse(-0.04 * u, 0.21 * u, 0.04 * u, 0.025 * u, 0, 0, 2 * Math.PI); ctx.fill();
+  ctx.strokeStyle = "#6e4b47"; ctx.lineWidth = Math.max(1, u * 0.05);
+  ctx.beginPath(); ctx.moveTo(0, 0.33 * u); ctx.lineTo(0, 0.42 * u);
+  ctx.moveTo(-0.1 * u, 0.46 * u); ctx.quadraticCurveTo(0, 0.42 * u, 0.1 * u, 0.46 * u); ctx.stroke();
+  // ojos
+  for (const s of [-1, 1]) {
+    ctx.fillStyle = "#1f1a1a"; ctx.beginPath(); ctx.arc(s * 0.33 * u, -0.04 * u, 0.15 * u, 0, 2 * Math.PI); ctx.fill();
+    ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(s * 0.33 * u + 0.05 * u, -0.09 * u, 0.05 * u, 0, 2 * Math.PI); ctx.fill();
+    ctx.fillStyle = "rgba(242, 170, 160, .35)"; ctx.beginPath(); ctx.ellipse(s * 0.52 * u, 0.26 * u, 0.12 * u, 0.07 * u, 0, 0, 2 * Math.PI); ctx.fill();
+  }
+  // collar azul con hebilla
+  ctx.fillStyle = "#2b45cf";
+  ctx.beginPath(); ctx.roundRect(-0.48 * u, 0.6 * u, 0.96 * u, 0.17 * u, 0.08 * u); ctx.fill();
+  ctx.fillStyle = "#4867ff"; ctx.beginPath(); ctx.roundRect(-0.13 * u, 0.57 * u, 0.26 * u, 0.23 * u, 0.05 * u); ctx.fill();
+  ctx.fillStyle = "#c7cbd6"; ctx.beginPath(); ctx.arc(0.33 * u, 0.69 * u, 0.06 * u, 0, 2 * Math.PI); ctx.fill();
+  ctx.restore();
+};
+</script>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const kFromSlider = v => 2 * Math.pow(10, 3 * v / 1000);
+  const sliderFromK = k => Math.round(1000 * Math.log10(k / 2) / 3);
+
+  const P = { m: 0.5, k: 50, L0: 1, g: 9.8, th0: 20, dr0: 0, sp: 1 };
+  $("s_k").value = sliderFromK(P.k);
+
+  // ---------- física ----------
+  const fe = (s, p) => {            // s = [r, ṙ, θ, θ̇]
+    const [r, rd, th, thd] = s;
+    return [rd,
+            r * thd * thd + p.g * Math.cos(th) - (p.k / p.m) * (r - p.L0),
+            thd,
+            -(p.g / r) * Math.sin(th) - 2 * rd * thd / r];
+  };
+  const fs = (s, p) => [s[1], -(p.g / p.Leq) * Math.sin(s[0])];  // s = [θ, θ̇]
+  function rk4(f, s, h, p) {
+    const add = (a, b, c) => a.map((x, i) => x + c * b[i]);
+    const k1 = f(s, p), k2 = f(add(s, k1, h / 2), p), k3 = f(add(s, k2, h / 2), p), k4 = f(add(s, k3, h), p);
+    return s.map((x, i) => x + h / 6 * (k1[i] + 2 * k2[i] + 2 * k3[i] + k4[i]));
+  }
+  const energy = (s, p) => {
+    const [r, rd, th, thd] = s;
+    return 0.5 * p.m * (rd * rd + r * r * thd * thd) - p.m * p.g * r * Math.cos(th) + 0.5 * p.k * (r - p.L0) ** 2;
+  };
+
+  let st, ss, t, E0, rows, nextSample, trail, hist, running = true, crossE, crossS, dmax;
+  const H = 0.0005, SAMPLE = 0.1, MAXROWS = 600;
+
+  function reset() {
+    P.Leq = P.L0 + P.m * P.g / P.k;
+    const r0 = Math.max(0.05, P.Leq + P.dr0 / 100);
+    const th0 = P.th0 * Math.PI / 180;
+    st = [r0, 0, th0, 0];
+    ss = [th0, 0];
+    t = 0; E0 = energy(st, P); rows = []; nextSample = 0; trail = []; hist = [];
+    crossE = []; crossS = []; dmax = r0 - P.L0;
+    $("tb").innerHTML = "";
+    sample();
+    updateMag();
+  }
+
+  function sample() {
+    const row = [t, st[0], (st[0] - P.L0) * 100, st[2] * 180 / Math.PI, ss[0] * 180 / Math.PI, energy(st, P)];
+    rows.push(row);
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${row[0].toFixed(1)}</td><td>${row[1].toFixed(4)}</td><td class="d">${row[2].toFixed(2)}</td>` +
+                   `<td class="e">${row[3].toFixed(2)}</td><td class="s">${row[4].toFixed(2)}</td><td>${row[5].toFixed(4)}</td>`;
+    const wrap = $("tblwrap");
+    const atBottom = wrap.scrollTop + wrap.clientHeight >= wrap.scrollHeight - 30;
+    $("tb").appendChild(tr);
+    if (rows.length > MAXROWS) { rows.shift(); $("tb").firstChild.remove(); }
+    if (atBottom) wrap.scrollTop = wrap.scrollHeight;
+    $("rows").textContent = `${rows.length} filas${rows.length >= MAXROWS ? " (últimos 60 s)" : ""}`;
+  }
+
+  function period(list) {
+    if (list.length < 2) return null;
+    const d = [];
+    for (let i = Math.max(1, list.length - 5); i < list.length; i++) d.push(list[i] - list[i - 1]);
+    return d.reduce((a, b) => a + b, 0) / d.length;
+  }
+
+  function step(dtReal) {
+    let n = Math.max(1, Math.round(dtReal * P.sp / H));
+    n = Math.min(n, 400);
+    for (let i = 0; i < n; i++) {
+      const thE = st[2], thS = ss[0];
+      st = rk4(fe, st, H, P);
+      ss = rk4(fs, ss, H, P);
+      if (st[0] < 0.02) { st[0] = 0.02; st[1] = Math.abs(st[1]); }
+      t += H;
+      if (thE < 0 && st[2] >= 0) crossE.push(t - H * st[2] / (st[2] - thE));
+      if (thS < 0 && ss[0] >= 0) crossS.push(t - H * ss[0] / (ss[0] - thS));
+      dmax = Math.max(dmax, st[0] - P.L0);
+      if (t >= nextSample + SAMPLE - 1e-9) { nextSample += SAMPLE; sample(); }
+    }
+    hist.push([t, st[2] * 180 / Math.PI, ss[0] * 180 / Math.PI, (st[0] - P.L0) * 100]);
+    while (hist.length && hist[0][0] < t - 10) hist.shift();
+  }
+
+  // ---------- magnitudes ----------
+  const f2 = (x, d = 2) => Number(x).toFixed(d);
+  function updateMag() {
+    const ws = Math.sqrt(P.k / P.m), wp = Math.sqrt(P.g / P.Leq), ratio = ws / wp;
+    const Ts = 2 * Math.PI / wp;
+    $("mag").innerHTML = `
+      <div>Largo en equilibrio<br><span class="f">L<sub>eq</sub> = L₀ + mg/k</span> = ${f2(P.L0)} + (${f2(P.m)} · ${f2(P.g, 1)}) / ${f2(P.k, 1)}
+        = ${f2(P.L0)} + ${f2(P.m * P.g, 3)} / ${f2(P.k, 1)} = <b>${f2(P.Leq, 3)} m</b></div>
+      <div>Rebote del resorte<br><span class="f">ω<sub>s</sub> = √(k/m)</span> = √(${f2(P.k, 1)} / ${f2(P.m)}) = √${f2(P.k / P.m, 2)} = <b>${f2(ws)} rad/s</b></div>
+      <div>Balanceo del péndulo<br><span class="f">ω<sub>p</sub> = √(g/L<sub>eq</sub>)</span> = √(${f2(P.g, 1)} / ${f2(P.Leq, 3)}) = √${f2(P.g / P.Leq, 3)} = <b>${f2(wp)} rad/s</b></div>
+      <div>Período simple (MAS)<br><span class="f">T = 2π/ω<sub>p</sub></span> = 2π / ${f2(wp)} = <b>${f2(Ts, 3)} s</b></div>
+      <div>Relación<br><span class="f">ω<sub>s</sub> / ω<sub>p</sub></span> = ${f2(ws)} / ${f2(wp)} = <b>${f2(ratio)}</b></div>`;
+    const a = $("alert");
+    if (Math.abs(ratio - 2) < 0.12) {
+      a.className = "alert res";
+      a.innerHTML = "⚡ <b>Resonancia</b> (ω<sub>s</sub> ≈ 2ω<sub>p</sub>): la energía pasa del balanceo al rebote y de vuelta. Mira cómo el péndulo deja de balancearse y solo rebota, y luego al revés.";
+    } else if (ratio > 8) {
+      a.className = "alert";
+      a.innerHTML = "La cuerda es casi rígida: el rebote es mucho más rápido que el balanceo y se comporta casi como el péndulo simple.";
+    } else {
+      a.className = "alert";
+      a.innerHTML = "El rebote y el balanceo se mezclan: la trayectoria ya no es un arco, el péndulo dibuja curvas.";
+    }
+  }
+
+  // ---------- dibujo ----------
+  const cv = $("cv"), ch = $("ch"), cx = cv.getContext("2d"), chx = ch.getContext("2d");
+  function fit(c) {
+    const r = c.getBoundingClientRect(), d = window.devicePixelRatio || 1;
+    if (c.width !== Math.round(r.width * d) || c.height !== Math.round(r.height * d)) {
+      c.width = Math.round(r.width * d); c.height = Math.round(r.height * d);
+    }
+    return [r.width, r.height, d];
+  }
+
+  function spring(ctx, x0, y0, x1, y1, coils, amp) {
+    const dx = x1 - x0, dy = y1 - y0, len = Math.hypot(dx, dy), ux = dx / len, uy = dy / len, nx = -uy, ny = ux;
+    const lead = Math.min(18, len * 0.12), body = len - 2 * lead, N = coils * 2;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0 + ux * lead, y0 + uy * lead);
+    for (let i = 1; i <= N; i++) {
+      const s = lead + body * (i - 0.5) / N, side = i % 2 ? 1 : -1;
+      ctx.lineTo(x0 + ux * s + nx * amp * side, y0 + uy * s + ny * amp * side);
+    }
+    ctx.lineTo(x1 - ux * lead, y1 - uy * lead); ctx.lineTo(x1, y1); ctx.stroke();
+  }
+
+  function draw() {
+    const [w, h, d] = fit(cv);
+    cx.setTransform(d, 0, 0, d, 0, 0); cx.clearRect(0, 0, w, h);
+    const Lref = Math.max(P.Leq + Math.max(0, P.dr0 / 100), P.Leq) * 1.45;
+    const sc = Math.min((h - 70) / Lref, (w * 0.45) / Lref);
+    const px = w / 2, py = 34;
+
+    // techo
+    cx.fillStyle = "#474c5e"; cx.fillRect(px - 70, py - 10, 140, 8);
+    cx.strokeStyle = "rgba(71,76,94,.35)"; cx.lineWidth = 1;
+    for (let i = -66; i < 70; i += 10) { cx.beginPath(); cx.moveTo(px + i, py - 10); cx.lineTo(px + i + 8, py - 18); cx.stroke(); }
+
+    // vertical y largo natural
+    cx.setLineDash([4, 5]); cx.strokeStyle = "rgba(63,67,82,.25)";
+    cx.beginPath(); cx.moveTo(px, py); cx.lineTo(px, py + Lref * sc * 0.98); cx.stroke();
+    cx.beginPath(); cx.arc(px, py, P.L0 * sc, Math.PI * 0.2, Math.PI * 0.8); cx.stroke();
+    cx.setLineDash([]);
+    cx.fillStyle = "#8a909c"; cx.font = "11px Inter";
+    cx.fillText("L₀ (sin estirar)", px + P.L0 * sc * Math.cos(Math.PI * 0.2) + 6, py + P.L0 * sc * Math.sin(Math.PI * 0.2));
+
+    const [r, , th] = st;
+    const bx = px + r * Math.sin(th) * sc, by = py + r * Math.cos(th) * sc;
+
+    // péndulo simple fantasma
+    if ($("c_ghost").checked) {
+      const gx = px + P.Leq * Math.sin(ss[0]) * sc, gy = py + P.Leq * Math.cos(ss[0]) * sc;
+      cx.strokeStyle = "rgba(92,91,212,.55)"; cx.lineWidth = 2; cx.setLineDash([6, 5]);
+      cx.beginPath(); cx.moveTo(px, py); cx.lineTo(gx, gy); cx.stroke(); cx.setLineDash([]);
+      cx.fillStyle = "rgba(92,91,212,.35)"; cx.beginPath(); cx.arc(gx, gy, 9 + 6 * Math.sqrt(P.m), 0, 2 * Math.PI); cx.fill();
+    }
+
+    // trayectoria
+    if ($("c_trail").checked) {
+      trail.push([bx, by]); if (trail.length > 600) trail.shift();
+      cx.lineWidth = 1.6;
+      for (let i = 1; i < trail.length; i++) {
+        cx.strokeStyle = `rgba(184,106,51,${(i / trail.length) * 0.7})`;
+        cx.beginPath(); cx.moveTo(trail[i - 1][0], trail[i - 1][1]); cx.lineTo(trail[i][0], trail[i][1]); cx.stroke();
+      }
+    } else trail = [];
+
+    // resorte
+    const stretch = r - P.L0;
+    cx.strokeStyle = stretch >= 0 ? "#2f6e6a" : "#b86a33"; cx.lineWidth = 2.2; cx.lineJoin = "round";
+    spring(cx, px, py, bx, by, 12, 7);
+
+    // masa
+    const R = 10 + 8 * Math.sqrt(P.m);
+    if ($("c_teddy").checked) drawTeddy(cx, bx, by, R * 1.25, -th, 1);
+    else {
+    const grd = cx.createRadialGradient(bx - R / 3, by - R / 3, 2, bx, by, R);
+    grd.addColorStop(0, "#5fa39d"); grd.addColorStop(1, "#2f6e6a");
+    cx.fillStyle = grd; cx.beginPath(); cx.arc(bx, by, R, 0, 2 * Math.PI); cx.fill();
+    cx.fillStyle = "#fff"; cx.font = "bold 11px Inter"; cx.textAlign = "center"; cx.fillText("m", bx, by + 4); cx.textAlign = "left";
+    }
+
+    // ángulo
+    cx.strokeStyle = "#5c5bd4"; cx.lineWidth = 1.5;
+    cx.beginPath(); cx.arc(px, py, 36, Math.PI / 2, Math.PI / 2 - th, th > 0); cx.stroke();
+    cx.fillStyle = "#5c5bd4"; cx.font = "italic 14px Cambria Math, serif";
+    cx.fillText("θ", px + 40 * Math.sin(th / 2) - 4, py + 52);
+
+    // lecturas
+    cx.fillStyle = "#3f4352"; cx.font = "600 12.5px Inter";
+    cx.fillText(`r = ${r.toFixed(3)} m`, 14, h - 40);
+    cx.fillStyle = "#b86a33"; cx.fillText(`estiramiento = ${(stretch * 100).toFixed(1)} cm`, 14, h - 22);
+    cx.fillStyle = "#2f6e6a"; cx.textAlign = "right";
+    cx.fillText(`θ = ${(th * 180 / Math.PI).toFixed(1)}°`, w - 14, h - 22); cx.textAlign = "left";
+
+    drawChart();
+  }
+
+  function drawChart() {
+    const [w, h, d] = fit(ch);
+    chx.setTransform(d, 0, 0, d, 0, 0); chx.clearRect(0, 0, w, h);
+    const L = 44, Rm = 10, half = (h - 18) / 2;
+    const t1 = Math.max(10, t), t0 = t1 - 10;
+    const X = tt => L + (tt - t0) / 10 * (w - L - Rm);
+    const thMax = Math.max(5, ...hist.map(p => Math.max(Math.abs(p[1]), Math.abs(p[2])))) * 1.1;
+    const dAbs = Math.max(1, ...hist.map(p => Math.abs(p[3] - (P.Leq - P.L0) * 100)));
+    const dMid = (P.Leq - P.L0) * 100;
+
+    function panel(y0, label) {
+      chx.strokeStyle = "rgba(63,67,82,.12)"; chx.lineWidth = 1;
+      chx.beginPath(); chx.moveTo(L, y0 + half / 2); chx.lineTo(w - Rm, y0 + half / 2); chx.stroke();
+      chx.strokeRect(L, y0 + 4, w - L - Rm, half - 8);
+      chx.fillStyle = "#8a909c"; chx.font = "10.5px Inter"; chx.textAlign = "right"; chx.fillText(label, w - Rm - 6, y0 + 16); chx.textAlign = "left";
+    }
+    panel(0, "θ (°): elástico vs. simple");
+    panel(half, "estiramiento r − L₀ (cm)");
+    chx.fillStyle = "#8a909c"; chx.font = "10px Inter"; chx.textAlign = "right";
+    chx.fillText(`${thMax.toFixed(0)}`, L - 4, 10); chx.fillText(`−${thMax.toFixed(0)}`, L - 4, half - 2);
+    chx.fillText(`${(dMid + dAbs).toFixed(1)}`, L - 4, half + 10); chx.fillText(`${(dMid - dAbs).toFixed(1)}`, L - 4, 2 * half - 2);
+    chx.textAlign = "center";
+    for (let s = Math.ceil(t0); s <= t1; s += 2) chx.fillText(`${s}`, X(s), h - 2);
+    chx.textAlign = "left";
+
+    const line = (idx, color, y0, yc, ys, dash) => {
+      chx.strokeStyle = color; chx.lineWidth = 2; chx.setLineDash(dash || []);
+      chx.beginPath();
+      hist.forEach((p, i) => { const x = X(p[0]), y = y0 + half / 2 - (p[idx] - yc) * ys; i ? chx.lineTo(x, y) : chx.moveTo(x, y); });
+      chx.stroke(); chx.setLineDash([]);
+    };
+    const sy = (half / 2 - 8) / thMax;
+    if ($("c_ghost").checked) line(2, "#5c5bd4", 0, 0, sy, [5, 4]);
+    line(1, "#2f6e6a", 0, 0, sy);
+    line(3, "#b86a33", half, dMid, (half / 2 - 8) / dAbs);
+  }
+
+  function stats() {
+    $("tnow").textContent = t.toFixed(2);
+    $("st_dmax").textContent = (dmax * 100).toFixed(1);
+    const te = period(crossE), ts = period(crossS);
+    $("st_Te").textContent = te ? te.toFixed(3) : "–";
+    $("st_Ts").textContent = ts ? ts.toFixed(3) : "–";
+    const dE = E0 !== 0 ? (energy(st, P) - E0) / Math.abs(E0) * 100 : 0;
+    $("st_dE").textContent = `${Math.abs(dE) < 0.001 ? "0.000" : dE.toFixed(3)} %`;
+  }
+
+  // ---------- bucle ----------
+  let last = performance.now();
+  function loop(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    if (document.getElementById("tab-elastica").classList.contains("on")) { if (running) step(dt); draw(); stats(); }
+    requestAnimationFrame(loop);
+  }
+
+  // ---------- controles ----------
+  const fmt = {
+    m: v => `${f2(v)} kg`, k: v => `${v < 100 ? f2(v, 1) : Math.round(v)} N/m`, L0: v => `${f2(v)} m`,
+    g: v => `${f2(v, 1)} m/s²`, th0: v => `${v}°`, dr0: v => `${v > 0 ? "+" : ""}${v} cm`, sp: v => `${f2(v)}×`
+  };
+  function readSliders() {
+    P.m = +$("s_m").value; P.k = kFromSlider(+$("s_k").value); P.L0 = +$("s_L0").value;
+    P.g = +$("s_g").value; P.th0 = +$("s_th0").value; P.dr0 = +$("s_dr0").value; P.sp = +$("s_sp").value;
+    for (const key of Object.keys(fmt)) $("v_" + key).textContent = fmt[key](P[key]);
+  }
+  ["m", "k", "L0", "g", "th0", "dr0"].forEach(key => $("s_" + key).addEventListener("input", () => { readSliders(); reset(); }));
+  $("s_sp").addEventListener("input", readSliders);
+  $("b_play").onclick = () => { running = !running; $("b_play").textContent = running ? "Pausa" : "Seguir"; };
+  $("b_reset").onclick = () => reset();
+
+  const presets = {
+    base:   { m: 0.5, k: 50,   L0: 1, g: 9.8, th0: 20, dr0: 0 },
+    rigida: { m: 0.5, k: 2000, L0: 1, g: 9.8, th0: 20, dr0: 0 },
+    res:    { m: 0.5, k: null, L0: 1, g: 9.8, th0: 2,  dr0: 12 },
+    rebote: { m: 0.5, k: 30,   L0: 1, g: 9.8, th0: 0,  dr0: 15 },
+    blanda: { m: 0.5, k: 8,    L0: 0.6, g: 9.8, th0: 35, dr0: 0 }
+  };
+  document.querySelectorAll("button.pre:not(.gpre)").forEach(b => b.onclick = () => {
+    const p = { ...presets[b.dataset.p] };
+    if (p.k === null) p.k = 3 * p.m * p.g / p.L0;   // ω_s = 2ω_p  →  k = 3mg/L₀
+    $("s_m").value = p.m; $("s_k").value = sliderFromK(p.k); $("s_L0").value = p.L0;
+    $("s_g").value = p.g; $("s_th0").value = p.th0; $("s_dr0").value = p.dr0;
+    readSliders();
+    if (b.dataset.p === "res") P.k = p.k;        // valor exacto, sin redondeo del slider
+    $("v_k").textContent = fmt.k(P.k);
+    reset();
+    running = true; $("b_play").textContent = "Pausa";
+  });
+
+  // copiar tabla
+  const tsv = () => ["t (s)\tr (m)\tEstiramiento (cm)\tθ elástico (°)\tθ simple (°)\tE (J)"]
+    .concat(rows.map(r => [r[0].toFixed(1), r[1].toFixed(4), r[2].toFixed(2), r[3].toFixed(2), r[4].toFixed(2), r[5].toFixed(4)].join("\t"))).join("\n");
+  $("b_copy").onclick = async () => {
+    const text = tsv();
+    try { await navigator.clipboard.writeText(text); $("b_copy").textContent = "¡Copiada!"; setTimeout(() => $("b_copy").textContent = "Copiar tabla (para Excel/Origin)", 1600); }
+    catch (e) { $("ta").value = text; $("modal").classList.add("on"); $("ta").select(); }
+  };
+  $("b_close").onclick = () => $("modal").classList.remove("on");
+
+  readSliders(); reset(); requestAnimationFrame(loop);
+})();
+</script>
+<script>
+(() => {
+  const show = () => {
+    const name = location.hash === "#elastica" ? "elastica" : "guia";
+    document.querySelectorAll(".tab").forEach(t => t.classList.toggle("on", t.id === "tab-" + name));
+    document.querySelectorAll(".tabs a").forEach(a => a.classList.toggle("on", a.dataset.tab === name));
+  };
+  window.addEventListener("hashchange", show); show();
+})();
+</script>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const visible = () => $("tab-guia").classList.contains("on");
+  const P = { L: 1.2, g: 9.8, th0: 20, m: 0.5, air: false, b: 0.05, sp: 1 };
+  const damp = p => (p.air ? p.b / p.m : 0);
+  const fx = (s, p) => [s[1], -damp(p) * s[1] - (p.g / p.L) * Math.sin(s[0])];
+  const fl = (s, p) => [s[1], -damp(p) * s[1] - (p.g / p.L) * s[0]];
+  function rk4(f, s, h, p) {
+    const add = (a, b, c) => a.map((x, i) => x + c * b[i]);
+    const k1 = f(s, p), k2 = f(add(s, k1, h / 2), p), k3 = f(add(s, k2, h / 2), p), k4 = f(add(s, k3, h), p);
+    return s.map((x, i) => x + h / 6 * (k1[i] + 2 * k2[i] + 2 * k3[i] + k4[i]));
+  }
+  const energy = (s, p) => 0.5 * p.m * p.L * p.L * s[1] * s[1] + p.m * p.g * p.L * (1 - Math.cos(s[0]));
+  const agm = (a, b) => { for (let i = 0; i < 30; i++) { const a2 = (a + b) / 2; b = Math.sqrt(a * b); a = a2; } return a; };
+
+  let sx, sl, t, E0, rows, nextSample, trail, hist, running = true, cross;
+  const H = 0.0005, SAMPLE = 0.1, MAXROWS = 600;
+  const deg = r => r * 180 / Math.PI;
+
+  function reset() {
+    const th0 = P.th0 * Math.PI / 180;
+    sx = [th0, 0]; sl = [th0, 0];
+    t = 0; E0 = energy(sx, P); rows = []; nextSample = 0; trail = []; hist = []; cross = [];
+    $("g_tb").innerHTML = "";
+    sample(); updateMag();
+  }
+
+  function sample() {
+    const row = [t, deg(sx[0]), deg(sl[0]), deg(sx[0] - sl[0]), energy(sx, P)];
+    rows.push(row);
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${row[0].toFixed(1)}</td><td class="e">${row[1].toFixed(2)}</td><td class="s">${row[2].toFixed(2)}</td>` +
+                   `<td class="d">${row[3].toFixed(2)}</td><td>${row[4].toFixed(4)}</td>`;
+    const wrap = $("g_tblwrap");
+    const atBottom = wrap.scrollTop + wrap.clientHeight >= wrap.scrollHeight - 30;
+    $("g_tb").appendChild(tr);
+    if (rows.length > MAXROWS) { rows.shift(); $("g_tb").firstChild.remove(); }
+    if (atBottom) wrap.scrollTop = wrap.scrollHeight;
+    $("g_rows").textContent = `${rows.length} filas${rows.length >= MAXROWS ? " (últimos 60 s)" : ""}`;
+  }
+
+  function period(list) {
+    if (list.length < 2) return null;
+    const d = [];
+    for (let i = Math.max(1, list.length - 5); i < list.length; i++) d.push(list[i] - list[i - 1]);
+    return d.reduce((a, b) => a + b, 0) / d.length;
+  }
+
+  function step(dtReal) {
+    const n = Math.min(400, Math.max(1, Math.round(dtReal * P.sp / H)));
+    for (let i = 0; i < n; i++) {
+      const prev = sx[0];
+      sx = rk4(fx, sx, H, P); sl = rk4(fl, sl, H, P); t += H;
+      if (prev < 0 && sx[0] >= 0) cross.push(t - H * sx[0] / (sx[0] - prev));
+      if (t >= nextSample + SAMPLE - 1e-9) { nextSample += SAMPLE; sample(); }
+    }
+    hist.push([t, deg(sx[0]), deg(sl[0]), deg(sx[0] - sl[0])]);
+    while (hist.length && hist[0][0] < t - 10) hist.shift();
+  }
+
+  const f2 = (x, d = 2) => Number(x).toFixed(d);
+  function updateMag() {
+    const w0 = Math.sqrt(P.g / P.L), T0 = 2 * Math.PI / w0, th0 = P.th0 * Math.PI / 180;
+    const corr = th0 * th0 / 16, Tap = T0 * (1 + corr), Tex = T0 / agm(1, Math.cos(th0 / 2));
+    const dif = (Tex - T0) / T0 * 100;
+    let html = `
+      <div>Frecuencia del MAS<br><span class="f">ω₀ = √(g/L)</span> = √(${f2(P.g, 1)} / ${f2(P.L)}) = √${f2(P.g / P.L, 3)} = <b>${f2(w0, 3)} rad/s</b></div>
+      <div>Período del MAS<br><span class="f">T₀ = 2π/ω₀</span> = 2π / ${f2(w0, 3)} = <b>${f2(T0, 3)} s</b></div>
+      <div>Ángulo en radianes<br><span class="f">θ₀ = ${P.th0}° · π/180</span> = <b>${f2(th0, 4)} rad</b></div>
+      <div>Período corregido (serie)<br><span class="f">T ≈ T₀(1 + θ₀²/16)</span> = ${f2(T0, 3)} · (1 + ${f2(th0, 4)}² / 16) = ${f2(T0, 3)} · (1 + ${f2(corr, 5)}) = <b>${f2(Tap, 3)} s</b></div>
+      <div>Período exacto<br><span class="f">T = T₀ / AGM(1, cos(θ₀/2))</span> = ${f2(T0, 3)} / ${f2(agm(1, Math.cos(th0 / 2)), 5)} = <b>${f2(Tex, 3)} s</b></div>
+      <div>Diferencia con el MAS<br><span class="f">(T − T₀)/T₀ · 100</span> = (${f2(Tex, 3)} − ${f2(T0, 3)}) / ${f2(T0, 3)} · 100 = <b>${f2(dif, 2)} %</b></div>`;
+    if (P.air) {
+      const gam = P.b / (2 * P.m);
+      html += `<div>Frenado por el aire<br><span class="f">γ = b/(2m)</span> = ${f2(P.b)} / (2 · ${f2(P.m)}) = <b>${f2(gam, 3)} 1/s</b></div>
+               <div>La amplitud baja a la mitad en<br><span class="f">t½ = ln 2 / γ</span> = 0.693 / ${f2(gam, 3)} = <b>${f2(Math.LN2 / gam, 1)} s</b></div>`;
+    }
+    $("g_mag").innerHTML = html;
+    $("gst_T0").textContent = f2(T0, 3);
+    const a = $("g_alert");
+    if (P.th0 <= 15) { a.className = "alert"; a.innerHTML = "Ángulo pequeño: sin θ ≈ θ funciona muy bien y las dos curvas van casi pegadas."; }
+    else if (P.th0 <= 45) { a.className = "alert"; a.innerHTML = "Ángulo medio: el MAS todavía se acerca, pero ya se nota que la exacta se va atrasando."; }
+    else if (P.th0 <= 140) { a.className = "alert res"; a.innerHTML = "Ángulo grande: el MAS ya no sirve. La exacta es claramente más lenta y el desfase crece en cada vuelta."; }
+    else { a.className = "alert res"; a.innerHTML = "Casi arriba: el péndulo se queda “colgado” arriba un buen rato y el período real se dispara."; }
+  }
+
+  // ---------- dibujo ----------
+  const cv = $("g_cv"), ch = $("g_ch"), cx = cv.getContext("2d"), chx = ch.getContext("2d");
+  function fit(c) {
+    const r = c.getBoundingClientRect(), d = window.devicePixelRatio || 1;
+    if (c.width !== Math.round(r.width * d) || c.height !== Math.round(r.height * d)) { c.width = Math.round(r.width * d); c.height = Math.round(r.height * d); }
+    return [r.width, r.height, d];
+  }
+  function bob(x, y, R, c1, c2, alpha) {
+    cx.globalAlpha = alpha;
+    const grd = cx.createRadialGradient(x - R / 3, y - R / 3, 2, x, y, R);
+    grd.addColorStop(0, c1); grd.addColorStop(1, c2);
+    cx.fillStyle = grd; cx.beginPath(); cx.arc(x, y, R, 0, 2 * Math.PI); cx.fill();
+    cx.globalAlpha = 1;
+  }
+
+  function draw() {
+    const [w, h, d] = fit(cv);
+    cx.setTransform(d, 0, 0, d, 0, 0); cx.clearRect(0, 0, w, h);
+    const big = P.th0 > 90;
+    const py = big ? h * 0.45 : 40, px = w / 2;
+    const td = $("gc_teddy").checked ? 60 : 0;
+    const sc = big ? Math.min(h * 0.4 - td * 0.6, w * 0.4) : Math.min(h - 90 - td, w * 0.42 / Math.max(0.3, Math.sin(Math.min(Math.PI / 2, P.th0 * Math.PI / 180))));
+    const R = 10 + 8 * Math.sqrt(P.m);
+
+    cx.fillStyle = "#474c5e"; cx.fillRect(px - 60, py - 10, 120, 8);
+    cx.strokeStyle = "rgba(71,76,94,.35)"; cx.lineWidth = 1;
+    for (let i = -56; i < 60; i += 10) { cx.beginPath(); cx.moveTo(px + i, py - 10); cx.lineTo(px + i + 8, py - 18); cx.stroke(); }
+    cx.setLineDash([4, 5]); cx.strokeStyle = "rgba(63,67,82,.25)";
+    cx.beginPath(); cx.moveTo(px, py); cx.lineTo(px, py + sc); cx.stroke();
+    cx.beginPath(); cx.arc(px, py, sc, 0, 2 * Math.PI); cx.stroke(); cx.setLineDash([]);
+
+    const pos = th => [px + sc * Math.sin(th), py + sc * Math.cos(th)];
+    if ($("gc_ghost").checked) {
+      const [gx, gy] = pos(sl[0]);
+      cx.strokeStyle = "rgba(92,91,212,.6)"; cx.lineWidth = 2; cx.setLineDash([6, 5]);
+      cx.beginPath(); cx.moveTo(px, py); cx.lineTo(gx, gy); cx.stroke(); cx.setLineDash([]);
+      bob(gx, gy, R, "#8f8ee6", "#5c5bd4", 0.45);
+    }
+    const [bx, by] = pos(sx[0]);
+    if ($("gc_trail").checked) {
+      trail.push([bx, by]); if (trail.length > 500) trail.shift();
+      cx.lineWidth = 1.6;
+      for (let i = 1; i < trail.length; i++) {
+        cx.strokeStyle = `rgba(184,106,51,${(i / trail.length) * 0.6})`;
+        cx.beginPath(); cx.moveTo(trail[i - 1][0], trail[i - 1][1]); cx.lineTo(trail[i][0], trail[i][1]); cx.stroke();
+      }
+    } else trail = [];
+    cx.strokeStyle = "#2f6e6a"; cx.lineWidth = 2.6;
+    cx.beginPath(); cx.moveTo(px, py); cx.lineTo(bx, by); cx.stroke();
+    if ($("gc_teddy").checked) drawTeddy(cx, bx, by, R * 1.25, -sx[0], 1);
+    else {
+    bob(bx, by, R, "#5fa39d", "#2f6e6a", 1);
+    cx.fillStyle = "#fff"; cx.font = "bold 11px Inter"; cx.textAlign = "center"; cx.fillText("m", bx, by + 4); cx.textAlign = "left";
+    }
+
+    cx.fillStyle = "#2f6e6a"; cx.font = "600 12.5px Inter";
+    cx.fillText(`θ exacta = ${deg(sx[0]).toFixed(1)}°`, 14, h - 40);
+    cx.fillStyle = "#5c5bd4"; cx.fillText(`θ MAS = ${deg(sl[0]).toFixed(1)}°`, 14, h - 22);
+    cx.fillStyle = "#b86a33"; cx.textAlign = "right";
+    cx.fillText(`diferencia = ${deg(sx[0] - sl[0]).toFixed(1)}°`, w - 14, h - 22); cx.textAlign = "left";
+    drawChart();
+  }
+
+  function drawChart() {
+    const [w, h, d] = fit(ch);
+    chx.setTransform(d, 0, 0, d, 0, 0); chx.clearRect(0, 0, w, h);
+    const L = 44, Rm = 10, half = (h - 18) / 2;
+    const t1 = Math.max(10, t), t0 = t1 - 10;
+    const X = tt => L + (tt - t0) / 10 * (w - L - Rm);
+    const thMax = Math.max(5, ...hist.map(p => Math.max(Math.abs(p[1]), Math.abs(p[2])))) * 1.1;
+    const dMax = Math.max(1, ...hist.map(p => Math.abs(p[3]))) * 1.1;
+    function panel(y0, label) {
+      chx.strokeStyle = "rgba(63,67,82,.12)"; chx.lineWidth = 1;
+      chx.beginPath(); chx.moveTo(L, y0 + half / 2); chx.lineTo(w - Rm, y0 + half / 2); chx.stroke();
+      chx.strokeRect(L, y0 + 4, w - L - Rm, half - 8);
+      chx.fillStyle = "#8a909c"; chx.font = "10.5px Inter"; chx.textAlign = "right"; chx.fillText(label, w - Rm - 6, y0 + 16); chx.textAlign = "left";
+    }
+    panel(0, "θ (°): exacta vs. MAS");
+    panel(half, "diferencia exacta − MAS (°)");
+    chx.fillStyle = "#8a909c"; chx.font = "10px Inter"; chx.textAlign = "right";
+    chx.fillText(`${thMax.toFixed(0)}`, L - 4, 10); chx.fillText(`−${thMax.toFixed(0)}`, L - 4, half - 2);
+    chx.fillText(`${dMax.toFixed(1)}`, L - 4, half + 10); chx.fillText(`−${dMax.toFixed(1)}`, L - 4, 2 * half - 2);
+    chx.textAlign = "center";
+    for (let s = Math.ceil(t0); s <= t1; s += 2) chx.fillText(`${s}`, X(s), h - 2);
+    chx.textAlign = "left";
+    const line = (idx, color, y0, ys, dash) => {
+      chx.strokeStyle = color; chx.lineWidth = 2; chx.setLineDash(dash || []);
+      chx.beginPath();
+      hist.forEach((p, i) => { const x = X(p[0]), y = y0 + half / 2 - p[idx] * ys; i ? chx.lineTo(x, y) : chx.moveTo(x, y); });
+      chx.stroke(); chx.setLineDash([]);
+    };
+    const sy = (half / 2 - 8) / thMax;
+    if ($("gc_ghost").checked) line(2, "#5c5bd4", 0, sy, [5, 4]);
+    line(1, "#2f6e6a", 0, sy);
+    line(3, "#b86a33", half, (half / 2 - 8) / dMax);
+  }
+
+  function stats() {
+    $("g_tnow").textContent = t.toFixed(2);
+    const te = period(cross), T0 = 2 * Math.PI / Math.sqrt(P.g / P.L);
+    $("gst_Te").textContent = te ? te.toFixed(3) : "–";
+    $("gst_dT").textContent = te ? `${((te - T0) / T0 * 100).toFixed(2)} %` : "–";
+    const dE = E0 ? (energy(sx, P) - E0) / E0 * 100 : 0;
+    $("gst_dE").textContent = `${Math.abs(dE) < 0.001 ? "0.000" : dE.toFixed(2)} %`;
+  }
+
+  let last = performance.now();
+  function loop(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    if (visible()) { if (running) step(dt); draw(); stats(); }
+    requestAnimationFrame(loop);
+  }
+
+  const fmt = { L: v => `${f2(v)} m`, g: v => `${f2(v, 1)} m/s²`, th0: v => `${v}°`, m: v => `${f2(v)} kg`, b: v => `${f2(v)} kg/s`, sp: v => `${f2(v)}×` };
+  function read() {
+    P.L = +$("gs_L").value; P.g = +$("gs_g").value; P.th0 = +$("gs_th0").value; P.m = +$("gs_m").value;
+    P.b = +$("gs_b").value; P.sp = +$("gs_sp").value; P.air = $("gc_air").checked;
+    for (const k of Object.keys(fmt)) $("gv_" + k).textContent = fmt[k](P[k]);
+    $("gs_b").disabled = !P.air; $("gs_b").parentElement.style.opacity = P.air ? 1 : 0.45;
+  }
+  ["L", "g", "th0", "m", "b"].forEach(k => $("gs_" + k).addEventListener("input", () => { read(); reset(); }));
+  $("gc_air").addEventListener("change", () => { read(); reset(); });
+  $("gs_sp").addEventListener("input", read);
+  $("gb_play").onclick = () => { running = !running; $("gb_play").textContent = running ? "Pausa" : "Seguir"; };
+  $("gb_reset").onclick = () => reset();
+
+  const presets = {
+    peq:    { L: 1.2, g: 9.8, th0: 10,  m: 0.5, air: false },
+    grande: { L: 1.2, g: 9.8, th0: 60,  m: 0.5, air: false },
+    arriba: { L: 1.2, g: 9.8, th0: 160, m: 0.5, air: false },
+    aire:   { L: 1.2, g: 9.8, th0: 30,  m: 0.5, air: true, b: 0.15 },
+    luna:   { L: 1.2, g: 1.6, th0: 20,  m: 0.5, air: false }
+  };
+  document.querySelectorAll("button.gpre").forEach(btn => btn.onclick = () => {
+    const p = presets[btn.dataset.p];
+    $("gs_L").value = p.L; $("gs_g").value = p.g; $("gs_th0").value = p.th0; $("gs_m").value = p.m;
+    $("gc_air").checked = p.air; if (p.b) $("gs_b").value = p.b;
+    read(); reset(); running = true; $("gb_play").textContent = "Pausa";
+  });
+
+  const tsv = () => ["t (s)\tθ exacta (°)\tθ MAS (°)\tDiferencia (°)\tE (J)"]
+    .concat(rows.map(r => [r[0].toFixed(1), r[1].toFixed(2), r[2].toFixed(2), r[3].toFixed(2), r[4].toFixed(4)].join("\t"))).join("\n");
+  $("gb_copy").onclick = async () => {
+    const text = tsv();
+    try { await navigator.clipboard.writeText(text); $("gb_copy").textContent = "¡Copiada!"; setTimeout(() => $("gb_copy").textContent = "Copiar tabla (para Excel/Origin)", 1600); }
+    catch (e) { $("ta").value = text; $("modal").classList.add("on"); $("ta").select(); }
+  };
+
+  read(); reset(); requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
